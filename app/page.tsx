@@ -1,104 +1,247 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabaseClient';
+
+interface Ingrediente {
+  id: number;
+  nombre: string;
+  cantidad: number;
+  unidad: string;
+}
+
 export default function Home() {
+  const [ingredientes, setIngredientes] = useState<Ingrediente[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [formData, setFormData] = useState({
+    nombre: '',
+    cantidad: '',
+    unidad: '',
+  });
+
+  // Cargar ingredientes al montar el componente
+  useEffect(() => {
+    cargarIngredientes();
+  }, []);
+
+  const cargarIngredientes = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('ingredientes')
+        .select('*')
+        .order('nombre', { ascending: true });
+
+      if (error) {
+        console.error('Error al cargar ingredientes:', error);
+        alert(`Error al cargar ingredientes: ${error.message}`);
+      } else {
+        setIngredientes(data || []);
+      }
+    } catch (error) {
+      console.error('Error inesperado:', error);
+      alert(`Error inesperado: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddIngrediente = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.nombre || !formData.cantidad || !formData.unidad) {
+      alert('Por favor, completa todos los campos');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('ingredientes')
+        .insert([
+          {
+            nombre: formData.nombre,
+            cantidad: parseFloat(formData.cantidad),
+            unidad: formData.unidad,
+          },
+        ])
+        .select();
+
+      if (error) {
+        console.error('Error al añadir ingrediente:', error);
+        alert(`Error al añadir ingrediente: ${error.message}`);
+      } else {
+        // Recargar la lista de ingredientes
+        await cargarIngredientes();
+        // Limpiar el formulario
+        setFormData({ nombre: '', cantidad: '', unidad: '' });
+        alert('✅ Ingrediente añadido correctamente');
+      }
+    } catch (error) {
+      console.error('Error inesperado:', error);
+      alert(`Error inesperado: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    }
+  };
+
+  const handleDeleteIngrediente = async (id: number) => {
+    if (!confirm('¿Estás seguro de que quieres eliminar este ingrediente?')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('ingredientes')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('Error al eliminar ingrediente:', error);
+        alert(`Error al eliminar ingrediente: ${error.message}`);
+      } else {
+        // Recargar la lista de ingredientes
+        await cargarIngredientes();
+        alert('✅ Ingrediente eliminado correctamente');
+      }
+    } catch (error) {
+      console.error('Error inesperado:', error);
+      alert(`Error inesperado: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-black text-white">
-      {/* Hero Section */}
-      <section className="flex min-h-screen flex-col items-center justify-center px-4 py-20 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-4xl text-center">
-          <h1 className="mb-6 text-5xl font-bold leading-tight tracking-tight sm:text-6xl lg:text-7xl">
-            Control Total de tu Producción
-          </h1>
-          <p className="mb-10 text-xl text-gray-300 sm:text-2xl">
-            Gestiona el stock, calcula mermas y planifica las compras de Culto Kebab en segundos
-          </p>
-          <button className="rounded-lg bg-orange-600 px-8 py-4 text-lg font-semibold text-white transition-all hover:bg-orange-700 hover:shadow-lg hover:shadow-orange-600/50 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:ring-offset-black">
-            Entrar al Panel
-          </button>
-        </div>
-      </section>
+    <div className="min-h-screen bg-black text-white p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Título */}
+        <h1 className="text-4xl font-bold mb-8 text-center">
+          CultoOps - Control de Stock
+        </h1>
 
-      {/* Features Section */}
-      <section className="bg-gray-950 px-4 py-20 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-6xl">
-          <div className="grid gap-8 md:grid-cols-3">
-            {/* Feature 1: Stock en Tiempo Real */}
-            <div className="rounded-xl border border-gray-800 bg-gray-900 p-8 transition-all hover:border-orange-600/50 hover:shadow-lg hover:shadow-orange-600/10">
-              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-lg bg-orange-600/20">
-                <svg
-                  className="h-8 w-8 text-orange-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                  />
-                </svg>
+        {/* Layout de dos columnas */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Columna Izquierda: Añadir Ingrediente */}
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+            <h2 className="text-2xl font-semibold mb-4 text-orange-500">
+              Añadir Stock
+            </h2>
+            <form onSubmit={handleAddIngrediente} className="space-y-4">
+              <div>
+                <label htmlFor="nombre" className="block text-sm font-medium mb-2">
+                  Nombre
+                </label>
+                <input
+                  type="text"
+                  id="nombre"
+                  value={formData.nombre}
+                  onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="Ej: Pollo, Tomate..."
+                />
               </div>
-              <h3 className="mb-3 text-2xl font-semibold">Stock en Tiempo Real</h3>
-              <p className="text-gray-400">
-                Sabe lo que tienes en la cámara
-              </p>
-            </div>
 
-            {/* Feature 2: Calculadora de Producción */}
-            <div className="rounded-xl border border-gray-800 bg-gray-900 p-8 transition-all hover:border-orange-600/50 hover:shadow-lg hover:shadow-orange-600/10">
-              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-lg bg-orange-600/20">
-                <svg
-                  className="h-8 w-8 text-orange-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-                  />
-                </svg>
+              <div>
+                <label htmlFor="cantidad" className="block text-sm font-medium mb-2">
+                  Cantidad
+                </label>
+                <input
+                  type="number"
+                  id="cantidad"
+                  step="0.01"
+                  value={formData.cantidad}
+                  onChange={(e) => setFormData({ ...formData, cantidad: e.target.value })}
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="Ej: 15.5"
+                />
               </div>
-              <h3 className="mb-3 text-2xl font-semibold">Calculadora de Producción</h3>
-              <p className="text-gray-400">
-                Dime cuánto venderás, te diré cuánto comprar
-              </p>
-            </div>
 
-            {/* Feature 3: Escandallos Automáticos */}
-            <div className="rounded-xl border border-gray-800 bg-gray-900 p-8 transition-all hover:border-orange-600/50 hover:shadow-lg hover:shadow-orange-600/10">
-              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-lg bg-orange-600/20">
-                <svg
-                  className="h-8 w-8 text-orange-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
-                  />
-                </svg>
+              <div>
+                <label htmlFor="unidad" className="block text-sm font-medium mb-2">
+                  Unidad
+                </label>
+                <input
+                  type="text"
+                  id="unidad"
+                  value={formData.unidad}
+                  onChange={(e) => setFormData({ ...formData, unidad: e.target.value })}
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="Ej: kg, litros, unidades..."
+                />
               </div>
-              <h3 className="mb-3 text-2xl font-semibold">Escandallos Automáticos</h3>
-              <p className="text-gray-400">
-                Control exacto de gramos por ración
-              </p>
-            </div>
+
+              <button
+                type="submit"
+                className="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-3 px-6 rounded-lg transition-all hover:shadow-lg hover:shadow-orange-600/50 focus:outline-none focus:ring-2 focus:ring-orange-500"
+              >
+                Añadir Stock
+              </button>
+            </form>
+          </div>
+
+          {/* Columna Derecha: Despensa */}
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+            <h2 className="text-2xl font-semibold mb-4 text-orange-500">
+              Despensa
+            </h2>
+
+            {loading ? (
+              <div className="text-center py-8 text-gray-400">
+                Cargando ingredientes...
+              </div>
+            ) : ingredientes.length === 0 ? (
+              <div className="text-center py-8 text-gray-400">
+                No hay ingredientes en la despensa
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-700">
+                      <th className="text-left py-3 px-4 font-semibold">Nombre</th>
+                      <th className="text-left py-3 px-4 font-semibold">Cantidad</th>
+                      <th className="text-left py-3 px-4 font-semibold">Unidad</th>
+                      <th className="text-center py-3 px-4 font-semibold">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ingredientes.map((ingrediente) => (
+                      <tr
+                        key={ingrediente.id}
+                        className="border-b border-gray-800 hover:bg-gray-800/50 transition-colors"
+                      >
+                        <td className="py-3 px-4">{ingrediente.nombre}</td>
+                        <td className="py-3 px-4">
+                          <span
+                            className={
+                              ingrediente.cantidad < 10
+                                ? 'text-red-500 font-semibold'
+                                : 'text-white'
+                            }
+                          >
+                            {ingrediente.cantidad}
+                            {ingrediente.cantidad < 10 && (
+                              <span className="ml-2 text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded">
+                                Poco Stock
+                              </span>
+                            )}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-gray-400">{ingrediente.unidad}</td>
+                        <td className="py-3 px-4 text-center">
+                          <button
+                            onClick={() => handleDeleteIngrediente(ingrediente.id)}
+                            className="text-red-400 hover:text-red-500 transition-colors"
+                            title="Eliminar ingrediente"
+                          >
+                            🗑️
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t border-gray-800 bg-black px-4 py-8 text-center text-gray-500 sm:px-6 lg:px-8">
-        <p>Internal Tool for Culto Kebab - 2026</p>
-      </footer>
+      </div>
     </div>
   );
 }
